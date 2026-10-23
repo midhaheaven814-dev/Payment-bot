@@ -9,7 +9,7 @@ INVITE_LINK = os.getenv("INVITE_LINK")
 BKASH_NUMBER = "01706433005"
 NAGAD_NUMBER = "01706433005"
 
-ADMIN_ID = 123456789  # @userinfobot কে /start লিখে তোমার ID এখানে বসাও
+ADMIN_ID = 8149546564  # @userinfobot কে /start লিখে তোমার ID এখানে বসাও
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (

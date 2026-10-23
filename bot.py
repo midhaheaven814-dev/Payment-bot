@@ -1,51 +1,49 @@
-import telebot
-from telebot import types
-import os, random
+import os
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_CHANNEL_ID = -1004450817952
 INVITE_LINK = os.getenv("INVITE_LINK")
 
-BKASH_NUMBERS = ["017XX-XXXXXX"]
-NAGAD_NUMBERS = ["018XX-XXXXXX"]
+# তোমার নাম্বার
+BKASH_NUMBER = "01706433005"
+NAGAD_NUMBER = "01706433005"
 
-bot = telebot.TeleBot(BOT_TOKEN)
-user_data = {}
+ADMIN_ID = 123456789  # @userinfobot কে /start লিখে তোমার ID এখানে বসাও
 
-@bot.message_handler(commands=['start','pay'])
-def pay(m):
-    text = f"💰 Payment\nবিকাশ: {random.choice(BKASH_NUMBERS)}\nনগদ: {random.choice(NAGAD_NUMBERS)}\n\nটাকা পাঠিয়ে ক্লিক করো 👇"
-    mk = types.InlineKeyboardMarkup()
-    mk.add(types.InlineKeyboardButton("✅ টাকা পাঠিয়েছি", callback_data="paid"))
-    bot.send_message(m.chat.id, text, reply_markup=mk)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (
+        f"💰 **পেমেন্ট করুন**\n\n"
+        f"📱 বিকাশ (Personal): `{BKASH_NUMBER}`\n"
+        f"📱 নগদ (Personal): `{NAGAD_NUMBER}`\n\n"
+        f"টাকা: 510 টাকা (বা তোমার নির্ধারিত)\n\n"
+        f"টাকা পাঠিয়ে নিচের বাটনে ক্লিক করো 👇"
+    )
+    keyboard = [[InlineKeyboardButton("✅ টাকা পাঠিয়েছি", callback_data="paid")]]
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
-@bot.callback_query_handler(func=lambda c: c.data=="paid")
-def ask_num(call):
-    msg = bot.send_message(call.message.chat.id, "কোন নাম্বার থেকে পাঠিয়েছো?")
-    bot.register_next_step_handler(msg, ask_trx)
+async def paid_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text(
+        "✅ ঠিক আছে!\n\n"
+        "এখন **টাকা পাঠানোর স্ক্রিনশট + Transaction ID** একসাথে পাঠাও 📸\n\n"
+        "যেমন: ছবির Caption এ লিখবে `TrxID: 8F9K2L1M`\n\n"
+        "⚠️ স্ক্রিনশট ছাড়া Approve হবে না।"
+    )
 
-def ask_trx(message):
-    user_data[message.chat.id] = {'sender': message.text}
-    msg = bot.send_message(message.chat.id, "TrxID দাও:")
-    bot.register_next_step_handler(msg, send_admin)
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    caption = update.message.caption or "কোনো TrxID লেখা নেই"
 
-def send_admin(message):
-    sender = user_data[message.chat.id]['sender']
-    trxid = message.text
-    txt = f"🔔 New Payment\nUser: @{message.from_user.username} ({message.from_user.id})\nSender: {sender}\nTrxID: {trxid}"
-    mk = types.InlineKeyboardMarkup()
-    mk.row(types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_{message.chat.id}"), types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_{message.chat.id}"))
-    bot.send_message(ADMIN_CHANNEL_ID, txt, reply_markup=mk)
-    bot.send_message(message.chat.id, "✅ Request পাঠানো হয়েছে।")
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("approve_"))
-def approve(call):
-    uid = int(call.data.split("_")[1])
-    bot.send_message(uid, f"✅ Verified! Link: {INVITE_LINK}")
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("reject_"))
-def reject(call):
-    uid = int(call.data.split("_")[1])
-    bot.send_message(uid, "❌ ভুল। আবার /pay দাও।")
-
-bot.infinity_polling()
+    # Admin এর কাছে পাঠানো
+    forward_text = (
+        f"🔔 নতুন পেমেন্ট জমা!\n\n"
+        f"👤 User: @{user.username}\n"
+        f"🆔 ID: {user.id}\n"
+        f"💬 TrxID/Caption: {caption}"
+    )
+    await context.bot.send_message(chat_id=ADMIN_ID, text=forward_text)
+    await context.bot.forward_message(chat_id=ADMIN_ID, from_chat_id=update.effective_chat.id, message_id=update.message.message_id)
+    
+    keyboard = [[Inline
